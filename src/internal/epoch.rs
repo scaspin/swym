@@ -31,6 +31,7 @@ use core::{
     sync::atomic::Ordering::{self, Acquire, Relaxed, Release},
 };
 use swym_htm::{HardwareTx, HtmUsize};
+use std::hash::{Hash, Hasher};
 
 type Storage = usize;
 type NonZeroStorage = NonZeroUsize;
@@ -229,7 +230,11 @@ impl EpochLock {
     pub const fn first() -> Self {
         EpochLock(HtmStorage::new(FIRST))
     }
-
+/*
+    pub const fn lock_number(&self, f: &mut Formatter<'_>) -> String {
+        f.debug_struct("EpochLock").field("epoch", &as_unlocked(self.load_raw(Relaxed).get())).finish()
+    }
+*/
     #[inline]
     fn load_raw(&self, o: Ordering) -> NonZeroStorage {
         let value = self.0.load(o);
@@ -394,6 +399,24 @@ impl EpochLock {
         drop(self.0.fetch_or(UNPARK_BIT, Relaxed));
     }
 }
+
+impl PartialEq for EpochLock{
+    fn eq(&self, other: &EpochLock) -> bool {
+       let thisval = unsafe {std::mem::transmute::<&EpochLock, usize>(self)}; 
+       let otherval =  unsafe {std::mem::transmute::<&EpochLock, usize>(other) };
+       thisval == otherval 
+    }
+}
+
+impl Eq for EpochLock{}
+
+impl Hash for EpochLock {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let address  = unsafe {std::mem::transmute::<&EpochLock, usize>(self) };
+        address.hash(state);
+    }
+}
+
 
 /// This holds the most recent epoch that a thread may currently be accessing, or INACTIVE_EPOCH if
 /// the thread is not currently accessing any transactional memory locations.

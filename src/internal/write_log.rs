@@ -15,7 +15,6 @@ use core::{
 };
 use std::collections::hash_map::{Entry as HashMapEntry, OccupiedEntry as HashMapOccupiedEntry};
 use priority_queue::PriorityQueue;
-use std::hash::{Hash, Hasher};
 
 #[repr(C)]
 pub struct WriteEntryImpl<'tcell, T> {
@@ -35,7 +34,7 @@ impl<'tcell, T> WriteEntryImpl<'tcell, T> {
 
 pub unsafe trait WriteEntry {}
 unsafe impl<'tcell, T> WriteEntry for WriteEntryImpl<'tcell, T> {}
-
+/*
 impl PartialEq for dyn WriteEntry{
     fn eq(&self, other: &dyn WriteEntry) -> bool {
         ptr::eq(self.tcell().map(|erased| &erased.current_epoch).unwrap(),other.tcell().map(|erased| &erased.current_epoch).unwrap())
@@ -49,7 +48,7 @@ impl Hash for dyn WriteEntry {
         let address  = unsafe {std::mem::transmute::<&EpochLock, usize>(self.tcell().map(|erased| &erased.current_epoch).unwrap()) };
         address.hash(state);
     }
-}
+}*/
 
 impl<'tcell> dyn WriteEntry + 'tcell {
     pub fn data_ptr(&self) -> NonNull<usize> {
@@ -63,6 +62,7 @@ impl<'tcell> dyn WriteEntry + 'tcell {
             NonNull::new_unchecked(raw.data as *mut _)
         }
     }
+
 
     #[inline]
     pub fn tcell(&self) -> &'_ Option<&'_ TCellErased> {
@@ -179,7 +179,7 @@ impl<'tcell> WriteLog<'tcell> {
         Option<&'a EpochLock>,
         impl FnMut(&'a (dyn WriteEntry + 'tcell)) -> Option<&'a EpochLock>,
     > {
-       
+        /*
         let iterator = self.data.iter();
         let mut q = PriorityQueue::new();
         for lock in iterator{
@@ -189,15 +189,17 @@ impl<'tcell> WriteLog<'tcell> {
             q.push(lock, weight);
         }
         let sorted_iter = q.into_sorted_vec().iter();
-        let mut new_vec = crate::internal::alloc::fvec::FVec::new();
-        for cell in sorted_iter {
+        let mut new_vec = crate::internal::alloc::dyn_vec::Iter::new(q.into_sorted_vec().iter());
+        or cell in sorted_iter {
             new_vec.push(cell);
         }
         // ATTEMP TO CONVERT TO VTABLE: let new_iter = crate::internal::alloc::dyn_vec::vtable::<dyn WriteEntry + 'tcell>(&new_vec.iter());
         let new_iter = new_vec.iter();
-        let map = new_iter.flat_map(|entry| {entry.tcell().map(|erased| &erased.current_epoch)});
+       */
         //let map = self.data.iter().flat_map(|entry| {entry.tcell().map(|erased| &erased.current_epoch)});
-        return map;
+        //let new_vec : Vec< &'a EpochLock>  = map.collect();
+        let new_map = self.data.iter().flat_map(|entry| {entry.tcell().map(|erased| &erased.current_epoch)});
+        return new_map;
     }
 
     #[inline]
@@ -282,9 +284,17 @@ impl<'tcell> WriteLog<'tcell> {
 
     #[inline]
     pub unsafe fn record_unchecked<T: 'static>(&mut self, dest_tcell: &'tcell TCellErased, val: T) {
+        
+        //LOCK SORTING
+        let mut q = PriorityQueue::new();
+        for lock in self.epoch_locks(){
+            let weight = std::mem::transmute::<&EpochLock, usize>(lock);
+            q.push(lock, weight);
+        }
+        let sorted_vec = q.into_sorted_vec();
         debug_assert!(
-            self.epoch_locks()
-                .find(|&x| ptr::eq(x, &dest_tcell.current_epoch))
+            sorted_vec.iter()
+                .find(|&x| ptr::eq(x, &&dest_tcell.current_epoch))
                 .is_none(),
             "attempt to add `TCell` to the `WriteLog` twice"
         );
