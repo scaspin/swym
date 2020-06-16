@@ -34,24 +34,9 @@ impl<'tcell, T> WriteEntryImpl<'tcell, T> {
 
 pub unsafe trait WriteEntry {}
 unsafe impl<'tcell, T> WriteEntry for WriteEntryImpl<'tcell, T> {}
-/*
-impl PartialEq for dyn WriteEntry{
-    fn eq(&self, other: &dyn WriteEntry) -> bool {
-        ptr::eq(self.tcell().map(|erased| &erased.current_epoch).unwrap(),other.tcell().map(|erased| &erased.current_epoch).unwrap())
-    }
-}
-
-impl Eq for dyn WriteEntry{}
-
-impl Hash for dyn WriteEntry {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let address  = unsafe {std::mem::transmute::<&EpochLock, usize>(self.tcell().map(|erased| &erased.current_epoch).unwrap()) };
-        address.hash(state);
-    }
-}*/
 
 impl<'tcell> dyn WriteEntry + 'tcell {
-    pub fn data_ptr(&self) -> NonNull<usize> {
+    fn data_ptr(&self) -> NonNull<usize> {
         debug_assert!(
             mem::align_of_val(self) >= mem::align_of::<NonNull<usize>>(),
             "incorrect alignment on data_ptr"
@@ -179,7 +164,7 @@ impl<'tcell> WriteLog<'tcell> {
         Option<&'a EpochLock>,
         impl FnMut(&'a (dyn WriteEntry + 'tcell)) -> Option<&'a EpochLock>,
     > {
-        /*
+        /* First (and not final) attempt at soring here rather than after call
         let iterator = self.data.iter();
         let mut q = PriorityQueue::new();
         for lock in iterator{
@@ -195,16 +180,16 @@ impl<'tcell> WriteLog<'tcell> {
         }
         // ATTEMP TO CONVERT TO VTABLE: let new_iter = crate::internal::alloc::dyn_vec::vtable::<dyn WriteEntry + 'tcell>(&new_vec.iter());
         let new_iter = new_vec.iter();
-       */
+       
         //let map = self.data.iter().flat_map(|entry| {entry.tcell().map(|erased| &erased.current_epoch)});
         //let new_vec : Vec< &'a EpochLock>  = map.collect();
-        let new_map = self.data.iter().flat_map(|entry| {entry.tcell().map(|erased| &erased.current_epoch)});
-        return new_map;
+        */
+        self.data.iter().flat_map(|entry| {entry.tcell().map(|erased| &erased.current_epoch)})
     }
 
     #[inline]
     pub fn write_entries<'a>(
-         &'a self,
+        &'a self,
     ) -> crate::internal::alloc::dyn_vec::Iter<'a, (dyn WriteEntry + 'tcell)> {
         self.data.iter()
     }

@@ -86,7 +86,6 @@ impl<'tcell> WriteLog<'tcell> {
         for entry in self.write_entries() {
             unsafe { entry.perform_write() };
             status = status.merge(entry.try_lock_htm(htx, pin_epoch));
-            println!("{:?}", entry.data_ptr());
         }
         status
     }

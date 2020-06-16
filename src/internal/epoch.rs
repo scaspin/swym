@@ -230,11 +230,7 @@ impl EpochLock {
     pub const fn first() -> Self {
         EpochLock(HtmStorage::new(FIRST))
     }
-/*
-    pub const fn lock_number(&self, f: &mut Formatter<'_>) -> String {
-        f.debug_struct("EpochLock").field("epoch", &as_unlocked(self.load_raw(Relaxed).get())).finish()
-    }
-*/
+    
     #[inline]
     fn load_raw(&self, o: Ordering) -> NonZeroStorage {
         let value = self.0.load(o);
