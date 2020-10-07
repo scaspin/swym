@@ -13,6 +13,7 @@ use core::{
 };
 use swym_htm::{BoundedHtxErr, HardwareTx};
 use priority_queue::PriorityQueue;
+use std::time::{Duration, Instant};
 
 const MAX_HTX_RETRIES: u8 = 3;
 
@@ -70,14 +71,14 @@ impl<'tcell> dyn WriteEntry + 'tcell {
 impl<'tcell> WriteLog<'tcell> {
     #[inline]
     unsafe fn publish(&self, sync_epoch: QuiesceEpoch) {
-        let mut q = PriorityQueue::new();
-        for lock in self.epoch_locks(){
-            let weight = std::mem::transmute::<&EpochLock, usize>(lock);
-            q.push(lock, weight);
-        }
-        let sorted_vec = q.into_sorted_vec();
-        sorted_vec.iter()
-            .for_each(|epoch_lock| epoch_lock.unlock_publish(sync_epoch))
+
+        let mut locks: Vec<&EpochLock> = self.epoch_locks().collect();
+        locks.sort_by(|x,y| unsafe{
+            std::mem::transmute::<&EpochLock, usize>(x)
+                .cmp(&std::mem::transmute::<&EpochLock, usize>(y))
+        });
+
+        locks.into_iter().for_each(|epoch_lock| epoch_lock.unlock_publish(sync_epoch))
     }
 
     #[inline]
@@ -104,6 +105,7 @@ impl<'tx, 'tcell> PinRw<'tx, 'tcell> {
     /// error. Returns true if the transaction committed successfully.
     #[inline]
     pub fn commit(self) -> bool {
+        //println!("start commit");
         if likely!(!self.logs().write_log.is_empty()) {
             self.commit_slow()
         } else {
@@ -143,11 +145,19 @@ impl<'tx, 'tcell> PinRw<'tx, 'tcell> {
     #[inline]
     fn commit_slow(self) -> bool {
         let mut retry_count = 0;
+        let time_start =  Instant::now();
+        //println!("start time: {:?}", time_start);
+        /*if(retry_count>0){
+            println!("retry_count: { }", retry_count);
+        }*/
         self.progress().wait_for_starvers();
         match self.start_htx(&mut retry_count) {
             Ok(htx) => {
                 let success = self.commit_hard(htx);
                 stats::htm_conflicts(retry_count as _);
+                let time_end = Instant::now();
+                let time_elapsed = time_end.duration_since(time_start);
+                println!("Number of retries: { }, time: {:?}", retry_count, time_elapsed);
                 success
             }
             Err(BoundedHtxErr::SoftwareFallback) => {
@@ -202,26 +212,29 @@ impl<'tx, 'tcell> PinRw<'tx, 'tcell> {
         let pin_epoch = self.pin_epoch();
         let mut unlock_until = None;
         
-        //SORT LOCKS
-        let mut q = PriorityQueue::new();
-        for lock in logs.write_log.epoch_locks(){
-            let weight = unsafe {std::mem::transmute::<&EpochLock, usize>(lock)};
-            q.push(lock, weight);
-        }
-        let sorted_vec = q.into_sorted_vec();
-        for epoch_lock in sorted_vec.iter() {
+
+        // scaspin: Sort Locks
+        let mut locks: Vec<&EpochLock> = logs.write_log.epoch_locks().collect();
+        locks.sort_by(|x,y| unsafe{
+            std::mem::transmute::<&EpochLock, usize>(x)
+                .cmp(&std::mem::transmute::<&EpochLock, usize>(y))
+        });
+
+        for epoch_lock in locks {
             match epoch_lock.try_lock(pin_epoch) {
                 Some(cur_status) => park_status = park_status.merge(cur_status),
                 None => {
-                    unlock_until = Some(*epoch_lock as *const _);
+                    unlock_until = Some(epoch_lock as *const _);
                     break;
                 }
             }
         }
+
         unsafe {
             if let Some(unlock_until) = unlock_until {
                 self.write_log_lock_failure(unlock_until)
             } else {
+                //println!("commit soft succeeds with {:?}", unlock_until); 
                 self.write_log_lock_success(park_status)
             }
         }
@@ -242,9 +255,18 @@ impl<'tx, 'tcell> PinRw<'tx, 'tcell> {
     #[cold]
     #[inline(never)]
     fn write_log_lock_failure(self, unlock_until: *const EpochLock) -> bool {
-        self.logs()
+        
+        //scaspin: sort locks
+        let mut locks: Vec<&EpochLock> = self.logs().write_log.epoch_locks().collect();
+        locks.sort_by(|x, y| unsafe {
+            std::mem::transmute::<&EpochLock, usize>(x)
+                .cmp(&std::mem::transmute::<&EpochLock, usize>(y))
+        });
+        
+        /*self.logs()
             .write_log
-            .epoch_locks()
+            .epoch_locks()i*/
+        locks.into_iter()
             .take_while(move |&e| !ptr::eq(e, unlock_until))
             .for_each(|epoch_lock| unsafe { epoch_lock.unlock_undo() });
         false
@@ -282,9 +304,18 @@ impl<'tx, 'tcell> PinRw<'tx, 'tcell> {
     #[cold]
     unsafe fn validation_failure(self) -> bool {
         // on fail unlock the write set
-        self.logs()
+        
+        //scaspin: sort locks
+        let mut locks: Vec<&EpochLock> = self.logs().write_log.epoch_locks().collect();
+        locks.sort_by(|x, y| unsafe {
+            std::mem::transmute::<&EpochLock, usize>(x)
+                .cmp(&std::mem::transmute::<&EpochLock, usize>(y))
+        });
+
+        /*self.logs()
             .write_log
-            .epoch_locks()
+            .epoch_locks()*/
+        locks.iter()
             .for_each(|epoch_lock| epoch_lock.unlock_undo());
         false
     }
