@@ -12,7 +12,7 @@ mod insert {
             let map = RBTreeMap::new();
 
             let mut num = 0 as u64;
-            for _ in 0..1_000 {
+            for _ in 0..100 {
                 num = num.wrapping_mul(17).wrapping_add(255);
                 map.insert(num, !num);
             }
@@ -27,13 +27,13 @@ mod insert {
                     let map = RBTreeMap::new();
 
                     let mut num = 0 as u64;
-                    for _ in 0..1_000 {
+                    for _ in 0..100 {
                         num = num.wrapping_mul(17).wrapping_add(255);
                         map.insert(num, !num);
                     }
 
                     let mut num = 0 as u64;
-                    for _ in 0..1_000 {
+                    for _ in 0..100 {
                         num = num.wrapping_mul(17).wrapping_add(255);
                         assert!(map.remove(&num).is_some());
                     }

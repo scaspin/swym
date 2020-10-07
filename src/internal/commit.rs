@@ -12,7 +12,6 @@ use core::{
     sync::atomic::{self, Ordering::Release},
 };
 use swym_htm::{BoundedHtxErr, HardwareTx};
-use priority_queue::PriorityQueue;
 use std::time::{Duration, Instant};
 
 const MAX_HTX_RETRIES: u8 = 3;

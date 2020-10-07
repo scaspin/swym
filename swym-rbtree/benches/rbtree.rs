@@ -14,11 +14,11 @@ mod rbtree {
     use swym_rbtree::RBTreeMap;
 
     const SAMPLE_SIZE: usize = 24;
-    const COUNT: usize = 100_000;
+    const COUNT: usize = 100;
     // Caps the total allocation size at a value where the allocators performance doesnt start to
     // crumble
-    const NUM_ITERATIONS: u64 = COUNT as u64 * 300 / 100_000;
-    const WARMUP_TIME_NS: u64 = 1_000_000_000;
+    const NUM_ITERATIONS: u64 = COUNT as u64 * 300 / 100;
+    const WARMUP_TIME_NS: u64 = 1_000;
 
     fn random_data(count: usize) -> Rc<Vec<usize>> {
         let mut vec = Vec::new();

@@ -5,7 +5,7 @@ mod memory {
     use std::sync::atomic::{AtomicIsize, Ordering::Relaxed};
     use swym::{tcell::TCell, thread_key, tx::Ordering};
 
-    #[test]
+    //#[test]
     fn _assert_single_threaded() {
         assert_eq!(
             std::env::var("RUST_TEST_THREADS")

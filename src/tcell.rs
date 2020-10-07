@@ -160,7 +160,7 @@ impl<T> TCell<T> {
         Tx::Target: Read<'tcell> + Sized,
     {
         View {
-            tx:    transaction,
+            tx:    r#transaction,
             tcell: self,
         }
     }

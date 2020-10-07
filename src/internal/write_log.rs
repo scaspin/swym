@@ -14,7 +14,6 @@ use core::{
     ptr::{self, NonNull}
 };
 use std::collections::hash_map::{Entry as HashMapEntry, OccupiedEntry as HashMapOccupiedEntry};
-use priority_queue::PriorityQueue;
 
 #[repr(C)]
 pub struct WriteEntryImpl<'tcell, T> {
@@ -250,16 +249,9 @@ impl<'tcell> WriteLog<'tcell> {
     #[inline]
     pub unsafe fn record_unchecked<T: 'static>(&mut self, dest_tcell: &'tcell TCellErased, val: T) {
         
-        //LOCK SORTING
-        let mut q = PriorityQueue::new();
-        for lock in self.epoch_locks(){
-            let weight = std::mem::transmute::<&EpochLock, usize>(lock);
-            q.push(lock, weight);
-        }
-        let sorted_vec = q.into_sorted_vec();
         debug_assert!(
-            sorted_vec.iter()
-                .find(|&x| ptr::eq(x, &&dest_tcell.current_epoch))
+            self.epoch_locks()
+                .find(|&x| ptr::eq(x, &dest_tcell.current_epoch))
                 .is_none(),
             "attempt to add `TCell` to the `WriteLog` twice"
         );
