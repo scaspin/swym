@@ -12,7 +12,7 @@ use core::{
     sync::atomic::{self, Ordering::Release},
 };
 use swym_htm::{BoundedHtxErr, HardwareTx};
-use std::time::{Duration, Instant};
+use std::time::{ Instant};
 
 const MAX_HTX_RETRIES: u8 = 3;
 
@@ -72,7 +72,7 @@ impl<'tcell> WriteLog<'tcell> {
     unsafe fn publish(&self, sync_epoch: QuiesceEpoch) {
 
         let mut locks: Vec<&EpochLock> = self.epoch_locks().collect();
-        locks.sort_by(|x,y| unsafe{
+        locks.sort_by(|x,y| {
             std::mem::transmute::<&EpochLock, usize>(x)
                 .cmp(&std::mem::transmute::<&EpochLock, usize>(y))
         });
@@ -306,7 +306,7 @@ impl<'tx, 'tcell> PinRw<'tx, 'tcell> {
         
         //scaspin: sort locks
         let mut locks: Vec<&EpochLock> = self.logs().write_log.epoch_locks().collect();
-        locks.sort_by(|x, y| unsafe {
+        locks.sort_by(|x, y| {
             std::mem::transmute::<&EpochLock, usize>(x)
                 .cmp(&std::mem::transmute::<&EpochLock, usize>(y))
         });
